@@ -1,6 +1,6 @@
 {
   "name": "rollup-plugin-posthtml-multi",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha1",
   "description": "Better, more flexible, integration between rollup and posthtml.",
   "main": "dist/index.js",
   "module": "dist/module.js",
@@ -37,5 +37,16 @@
     "rollup-plugin-filesize": "^6.1.1",
     "rollup-plugin-notify": "^1.1.0",
     "rollup-plugin-terser": "^5.0.0"
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OzymandiasTheGreat/rollup-plugin-posthtml-multi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OzymandiasTheGreat/rollup-plugin-posthtml-multi/issues"
+  },
+  "homepage": "https://github.com/OzymandiasTheGreat/rollup-plugin-posthtml-multi#readme"
 }
