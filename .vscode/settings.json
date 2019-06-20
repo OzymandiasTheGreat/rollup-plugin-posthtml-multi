@@ -1,0 +1,15 @@
+{
+	"spellright.language": [
+		"en_US",
+		"lt_LT",
+		"ru_RU"
+	],
+	"spellright.documentTypes": [
+		"markdown",
+		"latex",
+		"plaintext",
+		"json",
+		"javascript",
+		"html"
+	]
+}
