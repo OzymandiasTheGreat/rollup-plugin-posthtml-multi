@@ -13,10 +13,10 @@ const options = {
 				input: 'test/templates/extend/index.js',
 				plugins: [
 					posthtml({
-						extract: false,
 						logLevel: 'error',
 						options: {
 							plugins: [extend({ root: 'test/templates/extend/' })],
+							extract: false,
 						},
 					}),
 				],
@@ -32,10 +32,10 @@ const options = {
 				input: 'test/templates/extend/index.html',
 				plugins: [
 					posthtml({
-						extract: true,
 						logLevel: 'error',
 						options: {
 							plugins: [extend({ root: 'test/templates/extend/' })],
+							extract: true,
 						},
 					}),
 				],
@@ -43,6 +43,7 @@ const options = {
 			output: {
 				dir: 'test/result/extend/direct/',
 				format: 'iife',
+				name: 'extend',
 			},
 		},
 	},
@@ -52,10 +53,10 @@ const options = {
 				input: 'test/templates/include/index.js',
 				plugins: [
 					posthtml({
-						extract: false,
 						logLevel: 'error',
 						options: {
 							plugins: [include({ root: 'test/templates/include/' })],
+							extract: false,
 						},
 					}),
 				],
@@ -71,9 +72,9 @@ const options = {
 				input: 'test/templates/include/index.html',
 				plugins: [
 					posthtml({
-						extract: true,
 						logLevel: 'error',
 						options: {
+							extract: true,
 							plugins: [include({ root: 'test/templates/include/' })],
 						},
 					}),
@@ -82,6 +83,7 @@ const options = {
 			output: {
 				dir: 'test/result/include/direct/',
 				format: 'iife',
+				name: 'include',
 			},
 		},
 	},
@@ -91,10 +93,10 @@ const options = {
 				input: 'test/templates/modules/index.js',
 				plugins: [
 					posthtml({
-						extract: false,
 						logLevel: 'error',
 						options: {
 							plugins: [modules({ from: 'test/templates/modules/index.html' })],
+							extract: false,
 						},
 					}),
 				],
@@ -110,9 +112,9 @@ const options = {
 				input: 'test/templates/modules/index.html',
 				plugins: [
 					posthtml({
-						extract: true,
 						logLevel: 'error',
 						options: {
+							extract: true,
 							plugins: [modules({ from: 'test/templates/modules/index.html' })],
 						},
 					}),
@@ -121,6 +123,7 @@ const options = {
 			output: {
 				dir: 'test/result/modules/direct/',
 				format: 'iife',
+				name: 'modules',
 			},
 		},
 	},
@@ -130,9 +133,9 @@ const options = {
 const test = async (opts) => {
 	const bundle = await rollup.rollup(opts.input);
 
-	for (let path of bundle.watchFiles) {
-		console.log(`watching file: ${path}`);
-	}
+	// for (let path of bundle.watchFiles) {
+	// 	console.log(`watching file: ${path}`);
+	// }
 
 	await bundle.write(opts.output);
 };

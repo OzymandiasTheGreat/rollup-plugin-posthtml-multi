@@ -9,8 +9,6 @@ const pluginName = 'posthtml-multi';
 
 
 export default function({
-	extract = false,
-	fileName = '[name].[ext]',
 	watch = false,
 	importPath,
 	options: optionList = [{}],
@@ -74,7 +72,8 @@ export default function({
 		},
 
 		async transform(code, id) {
-			let matchingConfigs = [];
+			const matchingConfigs = [];
+			const parsedList = [];
 
 			for (let config of options) {
 				if (config._filter(id)) {
@@ -84,11 +83,18 @@ export default function({
 			if (!matchingConfigs.length) return null;
 
 			for (let config of matchingConfigs) {
-				if (!Array.isArray(output[id])) output[id] = [];
-				output[id].push((await posthtml(config.plugins || []).process(code, {
+				const parsed = (await posthtml(config.plugins || []).process(code, {
 					parser: config.parser,
 					directives: config.directives,
-				})).html);
+				})).html;
+				parsedList.push(parsed);
+				if (config.extract) {
+					if (!Array.isArray(output[id])) output[id] = [];
+					output[id].push({
+						code: parsed,
+						extract: config.extract,
+					});
+				}
 				if (watch) {
 					await posthtml([plugin.posthtmlHook(id, this)]).process(code, {
 						parser: config.parser,
@@ -97,48 +103,42 @@ export default function({
 				}
 			}
 			return {
-				// eslint-disable-next-line multiline-ternary
-				code: extract ? '' : `export default ${JSON.stringify(output[id][0])}`,
+				code: matchingConfigs.some((config) => config.extract)
+					? ''
+					: `export default ${JSON.stringify(parsedList[0])}`,
 				map: { mappings: '' },
 			};
 		},
 
 		async generateBundle(opts, bundle, isWrite) {
-			if (!isWrite || !extract) return;
+			if (!isWrite) return;
 
-			const genName = (file, iteration = 0) => {
-				const baseDir = opts.dir || path.dirname(opts.file);
-				const dir = typeof extract === 'string'
-					// eslint-disable-next-line no-extra-boolean-cast
-					? !!path.extname(extract)
-						? path.dirname(extract)
-						: extract
-					: baseDir;
-				const fileParts = path.parse(`${path.basename(file, path.extname(file))}.html`);
-				let finalName = fileName.replace('[name]', fileParts.name)
-					.replace('[ext]', fileParts.ext.substr(1))
-					.replace('[extname]', fileParts.ext);
-				finalName = finalName.includes('[fileNo]')
-					// eslint-disable-next-line multiline-ternary
-					? finalName.replace('[fileNo]', iteration ? iteration : '')
-					: iteration
-						? `${path.basename(finalName, '.html')}_${iteration}.html`
-						: finalName;
-				finalName = path.resolve(dir, finalName);
-				return finalName;
+			const getFileName = (file, extract) => {
+				const resolvePath = (dir, segment) => path.resolve(path.join(dir, segment));
+				const dir = opts.dir || path.dirname(opts.file);
+				if (typeof extract === 'string') {
+					if (path.isAbsolute(extract)) {
+						if (path.extname(extract)) return extract;
+						return `${extract}.html`;
+					}
+					if (path.extname(extract)) return resolvePath(dir, extract);
+					return resolvePath(dir, `${extract}.html`);
+				}
+				const source = path.basename(file, path.extname(file));
+				return resolvePath(dir, `${source}.html`);
 			};
 
 			for (let [id, codeList] of Object.entries(output)) {
 				for (let i = 0; i < codeList.length; i++) {
-					let assetName = genName(id, i);
+					let assetName = getFileName(id, codeList[i].extract, i);
 					let codeFile = {
 						fileName: assetName,
 						isAsset: true,
-						source: codeList[i],
+						source: codeList[i].code,
 					};
 					bundle[assetName] = codeFile;
-					delete output[id];
 				}
+				delete output[id];
 			}
 		}
 	};

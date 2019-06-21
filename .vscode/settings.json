@@ -1,8 +1,8 @@
 {
 	"spellright.language": [
-		"en_US",
-		"lt_LT",
-		"ru_RU"
+		"English (American)",
+		"Lithuanian",
+		"Russian-English Bilingual"
 	],
 	"spellright.documentTypes": [
 		"markdown",
