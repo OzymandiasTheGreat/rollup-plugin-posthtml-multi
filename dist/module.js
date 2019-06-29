@@ -1,2 +1,170 @@
-import r from"path";import t from"fs-extra";import{createFilter as e}from"rollup-pluginutils";import n from"posthtml";import i from"posthtml-match-helper";var o="posthtml-multi";export default function(a){var s=a.watch;void 0===s&&(s=!1);var c=a.importPath,u=a.options;void 0===u&&(u=[{}]);for(var l={},f=Array.isArray(u)?u:[u],h=0,m=f;h<m.length;h+=1){var p=m[h];p._filter=p.include?e(p.include,p.exclude):e("**/*.html",p.exclude)}var v={name:o,resolveImport:async function(e,n){var i=n||e;if(r.isAbsolute(e)&&await t.pathExists(e))return e;if(c){var o=r.join(r.resolve(c),e);if(await t.pathExists(o))return o}var a=r.resolve(e),s=r.join(r.resolve(r.dirname(i)),e);return await t.pathExists(a)?a:await t.pathExists(s)?s:null},posthtmlHook:function(r,e){var o=this;return function(a){return new Promise(function(s){var c=[];a.match(i("module[href],include[src],extends[src]"),function(i){c.push(new Promise(function(a){var s=i.attrs.href?i.attrs.href:i.attrs.src;o.resolveImport(s,r).then(function(r){null!==r&&(e.addWatchFile(r),t.readFile(r).then(function(t){n([o.posthtmlHook(r,e)]).process(t).then(function(){return a()}).catch(function(r){return e.error(r)})}).catch(function(r){return e.error(r)}))}).catch(function(r){return e.error(r)})}))}),Promise.all(c).then(function(){return s(a)}).catch(function(r){return e.error(r)})})}},transform:async function(r,t){for(var e=[],i=[],o=0,a=f;o<a.length;o+=1){var c=a[o];c._filter(t)&&e.push(c)}if(!e.length)return null;for(var u=0,h=e;u<h.length;u+=1){var m=h[u],p=(await n(m.plugins||[]).process(r,{parser:m.parser,directives:m.directives})).html;i.push(p),m.extract&&(Array.isArray(l[t])||(l[t]=[]),l[t].push({code:p,extract:m.extract})),s&&await n([v.posthtmlHook(t,this)]).process(r,{parser:m.parser,directives:m.directives})}return{code:e.some(function(r){return r.extract})?"":"export default "+JSON.stringify(i[0]),map:{mappings:""}}},generateBundle:async function(t,e,n){if(n)for(var i,o,a,s,c=0,u=Object.entries(l);c<u.length;c+=1){for(var f=u[c],h=f[0],m=f[1],p=0;p<m.length;p++){var v=(i=h,o=m[p].extract,a=void 0,s=void 0,a=function(t,e){return r.resolve(r.join(t,e))},s=t.dir||r.dirname(t.file),"string"==typeof o?r.isAbsolute(o)?r.extname(o)?o:o+".html":r.extname(o)?a(s,o):a(s,o+".html"):a(s,r.basename(i,r.extname(i))+".html")),d={fileName:v,isAsset:!0,source:m[p].code};e[v]=d}delete l[h]}}};return v}
+import path from 'path';
+import fs from 'fs-extra';
+import { createFilter } from 'rollup-pluginutils';
+import posthtml from 'posthtml';
+import matchHelper from 'posthtml-match-helper';
+
+var pluginName = 'posthtml-multi';
+
+
+function index(ref) {
+	var watch = ref.watch; if ( watch === void 0 ) watch = false;
+	var importPath = ref.importPath;
+	var optionList = ref.options; if ( optionList === void 0 ) optionList = [{}];
+
+	var output = {};
+	var options = Array.isArray(optionList)
+		? optionList
+		: [optionList];
+
+	for (var i = 0, list = options; i < list.length; i += 1) {
+		var config = list[i];
+
+		config._filter = config.include
+			? createFilter(config.include, config.exclude)
+			: createFilter('**/*.html', config.exclude);
+	}
+
+
+	var plugin = {
+		name: pluginName,
+
+		resolveImport: async function resolveImport(filePath, from) {
+			// eslint-disable-next-line multiline-ternary
+			var parent = from ? from : filePath;
+			if (path.isAbsolute(filePath) && await fs.pathExists(filePath)) { return filePath; }
+			if (importPath) {
+				var fromImportPath = path.join(path.resolve(importPath), filePath);
+				if (await fs.pathExists(fromImportPath)) { return fromImportPath; }
+			}
+			var fromCWD = path.resolve(filePath);
+			var fromEntry = path.join(path.resolve(path.dirname(parent)), filePath);
+			if (await fs.pathExists(fromCWD)) { return fromCWD; }
+			else if (await fs.pathExists(fromEntry)) { return fromEntry; }
+			return null;
+		},
+
+		posthtmlHook: function posthtmlHook(from, context) {
+			var this$1 = this;
+
+			return function (tree) { return new Promise(function (resolve) {
+				var promises = [];
+				tree.match(matchHelper('module[href],include[src],extends[src]'), function (node) {
+					promises.push(new Promise(function (resolveTask) {
+						var href = node.attrs.href
+							? node.attrs.href
+							: node.attrs.src;
+						this$1.resolveImport(href, from).then(function (nodePath) {
+							if (nodePath !== null) {
+								context.addWatchFile(nodePath);
+								fs.readFile(nodePath).then(function (code) {
+									posthtml([this$1.posthtmlHook(nodePath, context)])
+										.process(code)
+										.then(function () { return resolveTask(); })
+										.catch(function (err) { return context.error(err); });
+								})
+									.catch(function (err) { return context.error(err); });
+							}
+						})
+							.catch(function (err) { return context.error(err); });
+					}));
+				});
+				Promise.all(promises).then(function () { return resolve(tree); })
+					.catch(function (err) { return context.error(err); });
+			}); };
+		},
+
+		transform: async function transform(code, id) {
+			var matchingConfigs = [];
+			var parsedList = [];
+
+			for (var i = 0, list = options; i < list.length; i += 1) {
+				var config = list[i];
+
+				if (config._filter(id)) {
+					matchingConfigs.push(config);
+				}
+			}
+			if (!matchingConfigs.length) { return null; }
+
+			for (var i$1 = 0, list$1 = matchingConfigs; i$1 < list$1.length; i$1 += 1) {
+				var config$1 = list$1[i$1];
+
+				var parsed = (await posthtml(config$1.plugins || []).process(code, {
+					parser: config$1.parser,
+					directives: config$1.directives,
+				})).html;
+				parsedList.push(parsed);
+				if (config$1.extract) {
+					if (!Array.isArray(output[id])) { output[id] = []; }
+					output[id].push({
+						code: parsed,
+						extract: config$1.extract,
+					});
+				}
+				if (watch) {
+					await posthtml([plugin.posthtmlHook(id, this)]).process(code, {
+						parser: config$1.parser,
+						directives: config$1.directives,
+					});
+				}
+			}
+			return {
+				code: matchingConfigs.some(function (config) { return config.extract; })
+					? 'export default \'\''
+					: ("export default " + (JSON.stringify(parsedList[0]))),
+				map: { mappings: '' },
+			};
+		},
+
+		generateBundle: async function generateBundle(opts, bundle, isWrite) {
+			if (!isWrite) { return; }
+
+			var getFileName = function (file, extract) {
+				var resolvePath = function (dir) {
+					var segment = [], len = arguments.length - 1;
+					while ( len-- > 0 ) segment[ len ] = arguments[ len + 1 ];
+
+					return path.resolve(path.join.apply(path, [ dir ].concat( segment )));
+				};
+				var dir = opts.dir || path.dirname(opts.file);
+				var name = path.basename(file, path.extname(file));
+				if (typeof extract === 'string') {
+					if (path.isAbsolute(extract)) {
+						if (path.extname(extract)) { return extract; }
+						return ((path.join(extract, name)) + ".html");
+					}
+					if (path.extname(extract)) { return resolvePath(dir, extract); }
+					return resolvePath(dir, extract, (name + ".html"));
+				}
+				return resolvePath(dir, (name + ".html"));
+			};
+
+			for (var i$1 = 0, list = Object.entries(output); i$1 < list.length; i$1 += 1) {
+				var ref = list[i$1];
+				var id = ref[0];
+				var codeList = ref[1];
+
+				for (var i = 0; i < codeList.length; i++) {
+					var assetName = getFileName(id, codeList[i].extract);
+					var codeFile = {
+						fileName: assetName,
+						isAsset: true,
+						source: codeList[i].code,
+					};
+					bundle[assetName] = codeFile;
+
+					var jsName = (path.basename(id, path.extname(id))) + ".js";
+					if (bundle[jsName] && bundle[jsName].facadeModuleId === id && bundle[jsName].isEntry) {
+						delete bundle[jsName];
+					}
+				}
+				delete output[id];
+			}
+		}
+	};
+	return plugin;
+}
+
+export default index;
 //# sourceMappingURL=module.js.map

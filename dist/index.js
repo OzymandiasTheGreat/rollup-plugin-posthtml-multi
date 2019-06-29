@@ -1,2 +1,174 @@
-"use strict";function _interopDefault(t){return t&&"object"==typeof t&&"default"in t?t.default:t}var path=_interopDefault(require("path")),fs=_interopDefault(require("fs-extra")),rollupPluginutils=require("rollup-pluginutils"),posthtml=_interopDefault(require("posthtml")),matchHelper=_interopDefault(require("posthtml-match-helper")),pluginName="posthtml-multi";function index(t){var e=t.watch;void 0===e&&(e=!1);var r=t.importPath,n=t.options;void 0===n&&(n=[{}]);for(var a={},i=Array.isArray(n)?n:[n],o=0,s=i;o<s.length;o+=1){var l=s[o];l._filter=l.include?rollupPluginutils.createFilter(l.include,l.exclude):rollupPluginutils.createFilter("**/*.html",l.exclude)}var u={name:pluginName,resolveImport:async function(t,e){var n=e||t;if(path.isAbsolute(t)&&await fs.pathExists(t))return t;if(r){var a=path.join(path.resolve(r),t);if(await fs.pathExists(a))return a}var i=path.resolve(t),o=path.join(path.resolve(path.dirname(n)),t);return await fs.pathExists(i)?i:await fs.pathExists(o)?o:null},posthtmlHook:function(t,e){var r=this;return function(n){return new Promise(function(a){var i=[];n.match(matchHelper("module[href],include[src],extends[src]"),function(n){i.push(new Promise(function(a){var i=n.attrs.href?n.attrs.href:n.attrs.src;r.resolveImport(i,t).then(function(t){null!==t&&(e.addWatchFile(t),fs.readFile(t).then(function(n){posthtml([r.posthtmlHook(t,e)]).process(n).then(function(){return a()}).catch(function(t){return e.error(t)})}).catch(function(t){return e.error(t)}))}).catch(function(t){return e.error(t)})}))}),Promise.all(i).then(function(){return a(n)}).catch(function(t){return e.error(t)})})}},transform:async function(t,r){for(var n=[],o=[],s=0,l=i;s<l.length;s+=1){var p=l[s];p._filter(r)&&n.push(p)}if(!n.length)return null;for(var h=0,c=n;h<c.length;h+=1){var f=c[h],m=(await posthtml(f.plugins||[]).process(t,{parser:f.parser,directives:f.directives})).html;o.push(m),f.extract&&(Array.isArray(a[r])||(a[r]=[]),a[r].push({code:m,extract:f.extract})),e&&await posthtml([u.posthtmlHook(r,this)]).process(t,{parser:f.parser,directives:f.directives})}return{code:n.some(function(t){return t.extract})?"":"export default "+JSON.stringify(o[0]),map:{mappings:""}}},generateBundle:async function(t,e,r){if(r)for(var n,i,o,s,l=0,u=Object.entries(a);l<u.length;l+=1){for(var p=u[l],h=p[0],c=p[1],f=0;f<c.length;f++){var m=(n=h,i=c[f].extract,o=void 0,s=void 0,o=function(t,e){return path.resolve(path.join(t,e))},s=t.dir||path.dirname(t.file),"string"==typeof i?path.isAbsolute(i)?path.extname(i)?i:i+".html":path.extname(i)?o(s,i):o(s,i+".html"):o(s,path.basename(n,path.extname(n))+".html")),v={fileName:m,isAsset:!0,source:c[f].code};e[m]=v}delete a[h]}}};return u}module.exports=index;
+'use strict';
+
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+
+var path = _interopDefault(require('path'));
+var fs = _interopDefault(require('fs-extra'));
+var rollupPluginutils = require('rollup-pluginutils');
+var posthtml = _interopDefault(require('posthtml'));
+var matchHelper = _interopDefault(require('posthtml-match-helper'));
+
+var pluginName = 'posthtml-multi';
+
+
+function index(ref) {
+	var watch = ref.watch; if ( watch === void 0 ) watch = false;
+	var importPath = ref.importPath;
+	var optionList = ref.options; if ( optionList === void 0 ) optionList = [{}];
+
+	var output = {};
+	var options = Array.isArray(optionList)
+		? optionList
+		: [optionList];
+
+	for (var i = 0, list = options; i < list.length; i += 1) {
+		var config = list[i];
+
+		config._filter = config.include
+			? rollupPluginutils.createFilter(config.include, config.exclude)
+			: rollupPluginutils.createFilter('**/*.html', config.exclude);
+	}
+
+
+	var plugin = {
+		name: pluginName,
+
+		resolveImport: async function resolveImport(filePath, from) {
+			// eslint-disable-next-line multiline-ternary
+			var parent = from ? from : filePath;
+			if (path.isAbsolute(filePath) && await fs.pathExists(filePath)) { return filePath; }
+			if (importPath) {
+				var fromImportPath = path.join(path.resolve(importPath), filePath);
+				if (await fs.pathExists(fromImportPath)) { return fromImportPath; }
+			}
+			var fromCWD = path.resolve(filePath);
+			var fromEntry = path.join(path.resolve(path.dirname(parent)), filePath);
+			if (await fs.pathExists(fromCWD)) { return fromCWD; }
+			else if (await fs.pathExists(fromEntry)) { return fromEntry; }
+			return null;
+		},
+
+		posthtmlHook: function posthtmlHook(from, context) {
+			var this$1 = this;
+
+			return function (tree) { return new Promise(function (resolve) {
+				var promises = [];
+				tree.match(matchHelper('module[href],include[src],extends[src]'), function (node) {
+					promises.push(new Promise(function (resolveTask) {
+						var href = node.attrs.href
+							? node.attrs.href
+							: node.attrs.src;
+						this$1.resolveImport(href, from).then(function (nodePath) {
+							if (nodePath !== null) {
+								context.addWatchFile(nodePath);
+								fs.readFile(nodePath).then(function (code) {
+									posthtml([this$1.posthtmlHook(nodePath, context)])
+										.process(code)
+										.then(function () { return resolveTask(); })
+										.catch(function (err) { return context.error(err); });
+								})
+									.catch(function (err) { return context.error(err); });
+							}
+						})
+							.catch(function (err) { return context.error(err); });
+					}));
+				});
+				Promise.all(promises).then(function () { return resolve(tree); })
+					.catch(function (err) { return context.error(err); });
+			}); };
+		},
+
+		transform: async function transform(code, id) {
+			var matchingConfigs = [];
+			var parsedList = [];
+
+			for (var i = 0, list = options; i < list.length; i += 1) {
+				var config = list[i];
+
+				if (config._filter(id)) {
+					matchingConfigs.push(config);
+				}
+			}
+			if (!matchingConfigs.length) { return null; }
+
+			for (var i$1 = 0, list$1 = matchingConfigs; i$1 < list$1.length; i$1 += 1) {
+				var config$1 = list$1[i$1];
+
+				var parsed = (await posthtml(config$1.plugins || []).process(code, {
+					parser: config$1.parser,
+					directives: config$1.directives,
+				})).html;
+				parsedList.push(parsed);
+				if (config$1.extract) {
+					if (!Array.isArray(output[id])) { output[id] = []; }
+					output[id].push({
+						code: parsed,
+						extract: config$1.extract,
+					});
+				}
+				if (watch) {
+					await posthtml([plugin.posthtmlHook(id, this)]).process(code, {
+						parser: config$1.parser,
+						directives: config$1.directives,
+					});
+				}
+			}
+			return {
+				code: matchingConfigs.some(function (config) { return config.extract; })
+					? 'export default \'\''
+					: ("export default " + (JSON.stringify(parsedList[0]))),
+				map: { mappings: '' },
+			};
+		},
+
+		generateBundle: async function generateBundle(opts, bundle, isWrite) {
+			if (!isWrite) { return; }
+
+			var getFileName = function (file, extract) {
+				var resolvePath = function (dir) {
+					var segment = [], len = arguments.length - 1;
+					while ( len-- > 0 ) segment[ len ] = arguments[ len + 1 ];
+
+					return path.resolve(path.join.apply(path, [ dir ].concat( segment )));
+				};
+				var dir = opts.dir || path.dirname(opts.file);
+				var name = path.basename(file, path.extname(file));
+				if (typeof extract === 'string') {
+					if (path.isAbsolute(extract)) {
+						if (path.extname(extract)) { return extract; }
+						return ((path.join(extract, name)) + ".html");
+					}
+					if (path.extname(extract)) { return resolvePath(dir, extract); }
+					return resolvePath(dir, extract, (name + ".html"));
+				}
+				return resolvePath(dir, (name + ".html"));
+			};
+
+			for (var i$1 = 0, list = Object.entries(output); i$1 < list.length; i$1 += 1) {
+				var ref = list[i$1];
+				var id = ref[0];
+				var codeList = ref[1];
+
+				for (var i = 0; i < codeList.length; i++) {
+					var assetName = getFileName(id, codeList[i].extract);
+					var codeFile = {
+						fileName: assetName,
+						isAsset: true,
+						source: codeList[i].code,
+					};
+					bundle[assetName] = codeFile;
+
+					var jsName = (path.basename(id, path.extname(id))) + ".js";
+					if (bundle[jsName] && bundle[jsName].facadeModuleId === id && bundle[jsName].isEntry) {
+						delete bundle[jsName];
+					}
+				}
+				delete output[id];
+			}
+		}
+	};
+	return plugin;
+}
+
+module.exports = index;
 //# sourceMappingURL=index.js.map

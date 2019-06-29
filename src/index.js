@@ -104,7 +104,7 @@ export default function({
 			}
 			return {
 				code: matchingConfigs.some((config) => config.extract)
-					? ''
+					? 'export default \'\''
 					: `export default ${JSON.stringify(parsedList[0])}`,
 				map: { mappings: '' },
 			};
@@ -114,18 +114,18 @@ export default function({
 			if (!isWrite) return;
 
 			const getFileName = (file, extract) => {
-				const resolvePath = (dir, segment) => path.resolve(path.join(dir, segment));
+				const resolvePath = (dir, ...segment) => path.resolve(path.join(dir, ...segment));
 				const dir = opts.dir || path.dirname(opts.file);
+				const name = path.basename(file, path.extname(file));
 				if (typeof extract === 'string') {
 					if (path.isAbsolute(extract)) {
 						if (path.extname(extract)) return extract;
-						return `${extract}.html`;
+						return `${path.join(extract, name)}.html`;
 					}
 					if (path.extname(extract)) return resolvePath(dir, extract);
-					return resolvePath(dir, `${extract}.html`);
+					return resolvePath(dir, extract, `${name}.html`);
 				}
-				const source = path.basename(file, path.extname(file));
-				return resolvePath(dir, `${source}.html`);
+				return resolvePath(dir, `${name}.html`);
 			};
 
 			for (let [id, codeList] of Object.entries(output)) {
@@ -137,6 +137,11 @@ export default function({
 						source: codeList[i].code,
 					};
 					bundle[assetName] = codeFile;
+
+					const jsName = `${path.basename(id, path.extname(id))}.js`;
+					if (bundle[jsName] && bundle[jsName].facadeModuleId === id && bundle[jsName].isEntry) {
+						delete bundle[jsName];
+					}
 				}
 				delete output[id];
 			}
