@@ -11,8 +11,12 @@ import plugin from '../dist';
 import extend from 'posthtml-extend';
 import include from 'posthtml-include';
 import modules from 'posthtml-modules';
-import { rejects } from 'assert';
 
+
+// All these for a single example
+import fastGlob from 'fast-glob';
+import expressions from 'posthtml-expressions';
+import markdown from 'posthtml-markdown';
 
 const fixture = (...args) => path.resolve(path.join('test/fixtures', ...args));
 const result = (...args) => path.resolve(path.join('test/result', ...args));
@@ -87,15 +91,26 @@ describe('rollup-plugin-posthtml-multi', () => {
 		]);
 	}));
 
-	it('should NOT produce empty bundles when using html entry points', async () => {
-		const outDir = 'htmlOutput';
-		return write(run([fixture('basic', 'a.html'), fixture('basic', 'b.html')]), outDir, 'cjs')
-			.then(() => Promise.all([
-				assert(fs.existsSync(result(outDir, 'a.html'))),
-				assert(fs.existsSync(result(outDir, 'b.html'))),
-				assert(!fs.existsSync(result(outDir, 'a.js'))),
-				assert(!fs.existsSync(result(outDir, 'b.js'))),
-			]));
+	describe('should NOT produce empty bundles', () => {
+		it('when using single html entry point', () => {
+			const outDir = 'htmlOutput';
+			return write(run(fixture('basic', 'a.html')), outDir)
+				.then(() => Promise.all([
+					assert(fs.existsSync(result(outDir, 'a.html'))),
+					assert(!fs.existsSync(result(outDir, 'a.js'))),
+				]));
+		});
+
+		it('when using multiple html entry points', () => {
+			const outDir = 'htmlOutput';
+			return write(run([fixture('basic', 'a.html'), fixture('basic', 'b.html')]), outDir, 'cjs')
+				.then(() => Promise.all([
+					assert(fs.existsSync(result(outDir, 'a.html'))),
+					assert(fs.existsSync(result(outDir, 'b.html'))),
+					assert(!fs.existsSync(result(outDir, 'a.js'))),
+					assert(!fs.existsSync(result(outDir, 'b.js'))),
+				]));
+		});
 	});
 
 	describe('should watch html modules', () => {
@@ -122,5 +137,37 @@ describe('rollup-plugin-posthtml-multi', () => {
 			assert(bundle.watchFiles.includes(fixture('modules', 'module.html'))),
 			assert(bundle.watchFiles.includes(fixture('modules', 'deep_module.html'))),
 		])));
+	});
+
+	describe('should support given examples :)', () => {
+		it('And beyond...', () => {
+			const configureTemplates = () => fastGlob.sync(fixture('beyond', 'markdown', '*.md'))
+				.map((md) => ({
+					extract: result('beyond', `${path.basename(md, path.extname(md))}.html`),
+					plugins: [
+						expressions({ locals: { content: fs.readFileSync(md).toString() } }),
+						// TODO: fix passing no args in posthtml-markdown
+						markdown({ whitespace: '\t' }),
+					],
+				}));
+
+			return rollup({
+				input: fixture('beyond', 'template.html'),
+				plugins: plugin({ options: configureTemplates() }),
+			}).then((bundle) => bundle.write({
+				dir: result('beyond'),
+				format: 'iife',
+				name: 'bundle',
+			}).then((files) => {
+				const output = {};
+				files.output.forEach(({ fileName, source }) => {
+					output[fileName] = source;
+				});
+				return Promise.all([
+					assert(Object.keys(output).includes(result('beyond', 'a.html'))),
+					assert(Object.keys(output).includes(result('beyond', 'b.html'))),
+				]);
+			}));
+		});
 	});
 });
