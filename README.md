@@ -8,8 +8,11 @@ It allows importing html files as strings, extracting imported html files to out
 You can also pass array of configs, with their own include and exclude patterns, generating as many variations of templates as needed.
 This can be particullary useful e.g. when generating a static website from markdown sources.
 
-If you find this plugin useful do not hesitate to click that star!
+-------------------
 
+If you find this software useful do not hesitate to click that star and [consider becoming a patron](https://www.patreon.com/ozymandias)
+
+-------------------
 
 ## Install
 
